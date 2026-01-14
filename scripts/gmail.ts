@@ -491,6 +491,43 @@ async function getProfile(gmail: gmail_v1.Gmail): Promise<{
   };
 }
 
+async function downloadMessageAsEml(
+  gmail: gmail_v1.Gmail,
+  messageId: string,
+  outputPath?: string
+): Promise<{ path: string; size: number }> {
+  // Fetch the raw RFC 2822 formatted message
+  const res = await gmail.users.messages.get({
+    userId: "me",
+    id: messageId,
+    format: "raw",
+  });
+
+  if (!res.data.raw) {
+    throw new Error("No raw message data returned from Gmail API");
+  }
+
+  // Decode from base64url to binary
+  const rawMessage = Buffer.from(res.data.raw, "base64url");
+
+  // Determine output path
+  let finalPath: string;
+  if (outputPath) {
+    finalPath = outputPath;
+  } else {
+    // Generate filename from message ID
+    finalPath = `${messageId}.eml`;
+  }
+
+  // Write the EML file
+  await fs.writeFile(finalPath, rawMessage);
+
+  return {
+    path: finalPath,
+    size: rawMessage.length,
+  };
+}
+
 // ============================================================================
 // Calendar Operations
 // ============================================================================
@@ -675,6 +712,8 @@ GMAIL:
   label ID                Modify labels on a message
     --add=LABEL           Add label
     --remove=LABEL        Remove label
+  download ID             Download message as EML file
+    --output=PATH         Output file path (default: <id>.eml)
 
 CALENDAR:
   calendars               List all calendars
@@ -787,6 +826,15 @@ async function main(): Promise<void> {
         const removeLabels = flags.remove ? flags.remove.split(",") : [];
         await modifyLabels(gmail, messageId, addLabels, removeLabels);
         output({ success: true, data: { message: "Labels updated" } });
+        break;
+      }
+
+      case "download": {
+        const messageId = positional[0];
+        if (!messageId) fail("Message ID required. Usage: gmail.ts download <message-id> [--output=path.eml]");
+        const gmail = await getGmailClient();
+        const result = await downloadMessageAsEml(gmail, messageId, flags.output);
+        output({ success: true, data: { ...result, message: "Message downloaded as EML" } });
         break;
       }
 
