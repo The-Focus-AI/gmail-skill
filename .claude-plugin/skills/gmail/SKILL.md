@@ -1,7 +1,7 @@
 ---
 name: gmail
 description: This skill should be used when the user asks to "read emails", "send an email", "search gmail", "list messages", "check inbox", "manage labels", "find emails from", "check my calendar", "list events", "create an event", "schedule a meeting", or mentions Gmail/Calendar operations. Provides Gmail and Google Calendar API integration.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Gmail & Calendar Skill
@@ -10,9 +10,9 @@ Read, send, search Gmail. List, create, delete calendar events.
 
 ## First-Time Setup
 
-Run `pnpm gmail auth`. If credentials aren't configured yet, you'll see detailed setup instructions.
+Run `npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gmail.ts auth`. If credentials aren't configured yet, you'll see detailed setup instructions.
 
-Credentials are stored in `~/.config/gmail-skill/` and shared across all projects.
+Credentials are stored in `~/.config/google-skill/` and shared across all projects.
 
 ## Gmail Commands
 
@@ -55,6 +55,9 @@ npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gmail.ts send \
 # Labels
 npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gmail.ts labels
 npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gmail.ts label <id> --add="IMPORTANT"
+
+# Download as EML
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gmail.ts download <message-id>
 ```
 
 ## Calendar Commands

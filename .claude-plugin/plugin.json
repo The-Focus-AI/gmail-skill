@@ -1,10 +1,15 @@
 {
-  "name": "gmail-skill",
-  "version": "0.2.0",
-  "description": "Gmail API integration for reading, sending, and managing emails using OAuth 2.0",
+  "name": "google-skill",
+  "version": "0.3.0",
+  "description": "Google services integration for Gmail, Calendar, Sheets, Docs, and YouTube using OAuth 2.0",
   "author": {
     "name": "Focus.AI"
   },
-  "keywords": ["gmail", "email", "google", "oauth"],
-  "skills": ["./.claude-plugin/skills/gmail"]
+  "keywords": ["gmail", "google", "calendar", "sheets", "docs", "youtube", "oauth"],
+  "skills": [
+    "./.claude-plugin/skills/gmail",
+    "./.claude-plugin/skills/gsheets",
+    "./.claude-plugin/skills/gdocs",
+    "./.claude-plugin/skills/youtube"
+  ]
 }

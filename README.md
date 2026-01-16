@@ -1,21 +1,29 @@
-# gmail-skill
+# google-skill
 
-Gmail and Google Calendar integration for Claude Code. Read, send, search emails. List, create, delete calendar events.
+Full Google services integration for Claude Code: Gmail, Calendar, Sheets, Docs, and YouTube.
+
+## Features
+
+- **Gmail**: Read, send, search emails. Manage labels. Download as EML.
+- **Calendar**: List, create, delete events. Multiple calendar support.
+- **Sheets**: Create spreadsheets, read/write cells, append rows.
+- **Docs**: Create documents, read content, insert/append text, find/replace.
+- **YouTube**: Search, list videos/channels/playlists, view comments.
+
+All services share a single OAuth authentication.
 
 ## Installation
 
 ### Via Marketplace
 
-If the marketplace is set up:
-
 ```bash
-/plugin install The-Focus-AI/gmail-skill
+/plugin install The-Focus-AI/google-skill
 ```
 
 ### Direct Install
 
 ```bash
-/plugin install https://github.com/The-Focus-AI/gmail-skill
+/plugin install https://github.com/The-Focus-AI/google-skill
 ```
 
 Then restart Claude Code.
@@ -25,46 +33,109 @@ Then restart Claude Code.
 After installation, run:
 
 ```bash
-pnpm gmail auth
+npx tsx scripts/gmail.ts auth
 ```
 
-If this is your first time, you'll see setup instructions to create Google OAuth credentials. This is a one-time setup stored in `~/.config/gmail-skill/`.
+If this is your first time, you'll see setup instructions to create Google OAuth credentials. This is a one-time setup stored in `~/.config/google-skill/`.
 
-### What Gets Created
+### Required Google APIs
+
+Enable these APIs in Google Cloud Console:
+- Gmail API
+- Google Calendar API
+- Google Sheets API
+- Google Docs API
+- YouTube Data API v3
+- Google Drive API
+
+### OAuth Scopes
+
+The skill requests these scopes:
+- Gmail: read, send, modify
+- Calendar: read, events
+- Sheets: full access
+- Docs: full access
+- YouTube: read, upload
+- Drive: read-only (for listing files)
+
+### Token Storage
 
 ```
-~/.config/gmail-skill/
-├── credentials.json   # OAuth client (you create once)
-└── token.json         # Your refresh token (created by auth)
-```
+~/.config/google-skill/
+└── credentials.json   # OAuth client (you create once, shared across projects)
 
-These are shared across all projects - set up once, works everywhere.
+.claude/
+└── google-skill.local.json   # Per-project refresh token (auto-created)
+```
 
 ## Usage
 
 Once authenticated, Claude can:
 
 - **Gmail**: "check my unread emails", "send an email to...", "search for emails from..."
-- **Calendar**: "what's on my calendar today", "create a meeting for...", "list my upcoming events"
+- **Calendar**: "what's on my calendar today", "create a meeting for..."
+- **Sheets**: "list my spreadsheets", "read cells A1:D10 from...", "create a spreadsheet"
+- **Docs**: "list my documents", "read document...", "create a doc called..."
+- **YouTube**: "list my videos", "search YouTube for...", "get comments on..."
 
 ### Manual Commands
 
 ```bash
 # Gmail
-pnpm gmail list                          # List recent messages
-pnpm gmail list --query="is:unread"      # Search
-pnpm gmail read <message-id>             # Read message
-pnpm gmail send --to=x@y.com --subject="Hi" --body="Hello"
+npx tsx scripts/gmail.ts list
+npx tsx scripts/gmail.ts list --query="is:unread"
+npx tsx scripts/gmail.ts read <message-id>
+npx tsx scripts/gmail.ts send --to=x@y.com --subject="Hi" --body="Hello"
+npx tsx scripts/gmail.ts --help
 
 # Calendar
-pnpm gmail calendars                     # List calendars
-pnpm gmail events                        # Upcoming events
-pnpm gmail events --max=20               # More events
-pnpm gmail create --summary="Meeting" --start="2026-01-15T10:00:00" --end="2026-01-15T11:00:00"
-pnpm gmail delete <event-id>
+npx tsx scripts/gmail.ts calendars
+npx tsx scripts/gmail.ts events
+npx tsx scripts/gmail.ts create --summary="Meeting" --start="2026-01-15T10:00:00" --end="2026-01-15T11:00:00"
 
-# Help
-pnpm gmail --help
+# Sheets
+npx tsx scripts/gsheets.ts list
+npx tsx scripts/gsheets.ts read <spreadsheetId> "Sheet1!A1:D10"
+npx tsx scripts/gsheets.ts write <spreadsheetId> "Sheet1!A1" --values='[["Hello","World"]]'
+npx tsx scripts/gsheets.ts create --title="My Data"
+npx tsx scripts/gsheets.ts --help
+
+# Docs
+npx tsx scripts/gdocs.ts list
+npx tsx scripts/gdocs.ts read <documentId>
+npx tsx scripts/gdocs.ts create --title="My Document"
+npx tsx scripts/gdocs.ts append <documentId> --text="New paragraph"
+npx tsx scripts/gdocs.ts --help
+
+# YouTube
+npx tsx scripts/youtube.ts channels
+npx tsx scripts/youtube.ts videos
+npx tsx scripts/youtube.ts search --query="typescript tutorial"
+npx tsx scripts/youtube.ts comments <videoId>
+npx tsx scripts/youtube.ts --help
+```
+
+## Project Structure
+
+```
+google-skill/
+├── .claude-plugin/
+│   ├── plugin.json
+│   └── skills/
+│       ├── gmail/SKILL.md
+│       ├── gsheets/SKILL.md
+│       ├── gdocs/SKILL.md
+│       └── youtube/SKILL.md
+├── scripts/
+│   ├── lib/
+│   │   ├── auth.ts        # Shared OAuth
+│   │   └── output.ts      # Shared CLI helpers
+│   ├── gmail.ts           # Gmail + Calendar
+│   ├── gsheets.ts         # Google Sheets
+│   ├── gdocs.ts           # Google Docs
+│   └── youtube.ts         # YouTube
+├── package.json
+└── README.md
 ```
 
 ## Local Development
@@ -72,85 +143,34 @@ pnpm gmail --help
 ### Test Without Installing
 
 ```bash
-# Clone the repo
-git clone https://github.com/The-Focus-AI/gmail-skill
-cd gmail-skill
-
-# Install dependencies
+git clone https://github.com/The-Focus-AI/google-skill
+cd google-skill
 pnpm install
 
-# Test commands directly
-pnpm gmail --help
-pnpm gmail auth
-pnpm gmail list
+# Test commands
+npx tsx scripts/gmail.ts --help
+npx tsx scripts/gsheets.ts --help
+npx tsx scripts/gdocs.ts --help
+npx tsx scripts/youtube.ts --help
 ```
 
 ### Test as Plugin
 
 ```bash
-# Run Claude Code with the plugin loaded from local directory
-claude --plugin-dir /path/to/gmail-skill
+claude --plugin-dir /path/to/google-skill
 ```
-
-Then try: "list my unread emails" or "what's on my calendar"
-
-### Development Workflow
-
-1. Make changes to `scripts/gmail.ts`
-2. Test directly: `pnpm gmail <command>`
-3. Test as plugin: `claude --plugin-dir .`
-4. Commit and push
-
-## Project Structure
-
-```
-gmail-skill/
-├── .claude-plugin/
-│   ├── plugin.json                    # Plugin manifest
-│   └── skills/gmail/
-│       ├── SKILL.md                   # Skill definition (triggers, docs)
-│       └── references/                # Additional documentation
-├── scripts/
-│   └── gmail.ts                       # Main CLI tool
-├── package.json
-└── README.md
-```
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `XDG_CONFIG_HOME` | Override config directory (default: `~/.config`) |
-| `GMAIL_TOKEN_PATH` | Override token location |
-
-### Gmail Search Syntax
-
-```
-is:unread                    # Unread messages
-from:alice@example.com       # From specific sender
-to:bob@example.com           # To specific recipient
-subject:meeting              # Subject contains word
-has:attachment               # Has attachments
-newer_than:7d                # Within last 7 days
-older_than:1m                # Older than 1 month
-label:work                   # Has specific label
-```
-
-Combine: `from:boss@company.com is:unread newer_than:7d`
 
 ## Troubleshooting
 
 ### "Credentials not found"
 
-Run `pnpm gmail auth` and follow the setup instructions.
+Run `npx tsx scripts/gmail.ts auth` and follow the setup instructions.
 
 ### "Token expired" or "Invalid credentials"
 
 ```bash
-rm ~/.config/gmail-skill/token.json
-pnpm gmail auth
+rm .claude/google-skill.local.json
+npx tsx scripts/gmail.ts auth
 ```
 
 ### "No refresh token received"
@@ -158,15 +178,23 @@ pnpm gmail auth
 The app was already authorized. Revoke access and retry:
 
 1. Go to https://myaccount.google.com/permissions
-2. Find and remove "Gmail Skill" (or whatever you named it)
-3. Run `pnpm gmail auth` again
+2. Remove access for the app
+3. Run auth again
 
 ### "Access blocked" during OAuth
 
-Your OAuth consent screen may not be configured correctly. Check:
-- APIs are enabled (Gmail API, Google Calendar API)
+Check:
+- All required APIs are enabled
 - Your email is added as a test user
-- Scopes are configured
+- Scopes are configured in OAuth consent screen
+
+### Upgrading from gmail-skill
+
+The skill will automatically detect and use old token/credential locations:
+- `~/.config/gmail-skill/credentials.json` → still works
+- `.claude/gmail-skill.local.json` → still works
+
+New auth will use the new locations.
 
 ## License
 

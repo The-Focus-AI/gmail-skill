@@ -1,10 +1,13 @@
 {
-  "name": "gmail-skill",
-  "version": "0.1.0",
-  "description": "Gmail API integration skill for Claude Code",
+  "name": "google-skill",
+  "version": "0.3.0",
+  "description": "Google services skill for Claude Code - Gmail, Calendar, Sheets, Docs, YouTube",
   "type": "module",
   "scripts": {
-    "gmail": "npx tsx scripts/gmail.ts"
+    "gmail": "npx tsx scripts/gmail.ts",
+    "gsheets": "npx tsx scripts/gsheets.ts",
+    "gdocs": "npx tsx scripts/gdocs.ts",
+    "youtube": "npx tsx scripts/youtube.ts"
   },
   "dependencies": {
     "googleapis": "^144.0.0",
