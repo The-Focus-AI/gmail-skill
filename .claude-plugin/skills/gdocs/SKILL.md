@@ -10,7 +10,13 @@ Create, read, and edit Google Docs documents.
 
 ## First-Time Setup
 
-Run `npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gmail.ts auth` to authenticate. This grants access to all Google services including Docs.
+Run `npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gmail.ts auth` to authenticate with Google. This opens a browser for OAuth consent and grants access to all Google services including Docs.
+
+Tokens are stored per-project in `.claude/google-skill.local.json`.
+
+## Using Your Own Credentials (Optional)
+
+By default, this skill uses embedded OAuth credentials. To use your own Google Cloud project instead, save your credentials to `~/.config/google-skill/credentials.json`.
 
 ## Commands
 

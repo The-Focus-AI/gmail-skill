@@ -14,6 +14,11 @@ import open from "open";
 // Configuration
 // ============================================================================
 
+// Embedded OAuth credentials - shared across all users of this skill
+// These are for a "Desktop app" OAuth client in the Focus.AI Google Cloud project
+const EMBEDDED_CLIENT_ID = "698519768904-a9gugk8v64ndbp5cq1qp6gihov987vd2.apps.googleusercontent.com";
+const EMBEDDED_CLIENT_SECRET = "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";
+
 // Global config for OAuth client credentials (same across all projects)
 export function getGlobalConfigDir(): string {
   const xdgConfig = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
@@ -169,7 +174,7 @@ interface Credentials {
 }
 
 export async function loadCredentials(): Promise<Credentials> {
-  // Try new location first
+  // First, check for user-provided credentials (allows overriding embedded ones)
   for (const credPath of [CREDENTIALS_PATH, LEGACY_CREDENTIALS_PATH]) {
     try {
       const content = await fs.readFile(credPath, "utf-8");
@@ -191,8 +196,11 @@ export async function loadCredentials(): Promise<Credentials> {
     }
   }
 
-  console.error(SETUP_INSTRUCTIONS);
-  throw new Error(`Credentials not found at ${CREDENTIALS_PATH}`);
+  // Fall back to embedded credentials (no setup required)
+  return {
+    client_id: EMBEDDED_CLIENT_ID,
+    client_secret: EMBEDDED_CLIENT_SECRET,
+  };
 }
 
 export async function findTokenPath(): Promise<string | null> {

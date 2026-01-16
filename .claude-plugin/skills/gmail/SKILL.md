@@ -10,9 +10,19 @@ Read, send, search Gmail. List, create, delete calendar events.
 
 ## First-Time Setup
 
-Run `npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gmail.ts auth`. If credentials aren't configured yet, you'll see detailed setup instructions.
+Run `npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gmail.ts auth` to authenticate with Google. This opens a browser for OAuth consent.
 
-Credentials are stored in `~/.config/google-skill/` and shared across all projects.
+Tokens are stored per-project in `.claude/google-skill.local.json`.
+
+## Using Your Own Credentials (Optional)
+
+By default, this skill uses embedded OAuth credentials. To use your own Google Cloud project credentials instead:
+
+1. Create a Google Cloud project and enable the required APIs (Gmail, Calendar, Sheets, Docs, YouTube, Drive)
+2. Create OAuth 2.0 credentials (Desktop app type)
+3. Download the JSON and save to `~/.config/google-skill/credentials.json`
+
+The skill will automatically use your credentials if that file exists.
 
 ## Gmail Commands
 

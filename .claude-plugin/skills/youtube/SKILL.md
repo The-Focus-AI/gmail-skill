@@ -1,18 +1,24 @@
 ---
 name: youtube
-description: This skill should be used when the user asks about "youtube", "my videos", "my channel", "youtube search", "video comments", "playlists", "list videos", "channel stats", "video details", or mentions YouTube operations. Provides YouTube Data API integration for searching, listing videos, channels, and playlists.
-version: 0.1.0
+description: This skill should be used when the user asks about "youtube", "my videos", "my channel", "youtube search", "video comments", "playlists", "list videos", "channel stats", "video details", "download video", "get transcript", "video subtitles", or mentions YouTube operations. Provides YouTube Data API integration and yt-dlp for downloading videos, transcripts, and metadata from any channel.
+version: 0.2.0
 ---
 
 # YouTube Skill
 
-Search YouTube, list videos, channels, playlists, and view comments.
+Search YouTube, list videos, channels, playlists, view comments, download videos, and extract transcripts.
 
 ## First-Time Setup
 
-Run `npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gmail.ts auth` to authenticate. This grants access to all Google services including YouTube.
+For API commands (your channel data): Run `npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gmail.ts auth` to authenticate with Google. Tokens are stored per-project in `.claude/google-skill.local.json`.
 
-## Commands
+For yt-dlp commands (any public content): Install yt-dlp with `brew install yt-dlp` (no auth needed).
+
+## Using Your Own Credentials (Optional)
+
+By default, this skill uses embedded OAuth credentials. To use your own Google Cloud project instead, save your credentials to `~/.config/google-skill/credentials.json`.
+
+## API Commands (Requires OAuth)
 
 ```bash
 # List your YouTube channels
@@ -38,20 +44,90 @@ npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts playlist <playlistId>
 # Search YouTube
 npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts search --query="typescript tutorial"
 npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts search --query="coding" --type=video --max=5
-npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts search --query="tech" --type=channel
 
 # Get video comments
-npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts comments <videoId>
 npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts comments <videoId> --max=50
 ```
 
-## Search Options
+## yt-dlp Commands (No Auth Required)
+
+These commands use yt-dlp to access any public YouTube content without OAuth.
+
+### Get Video Metadata
+
+```bash
+# Get detailed info about any video
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts dl-info dQw4w9WgXcQ
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts dl-info "https://youtube.com/watch?v=..."
+```
+
+### List Channel Videos
+
+```bash
+# List videos from any public channel (by @handle, channel ID, or URL)
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts dl-channel @mkbhd
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts dl-channel UCXuqSBlHAE6Xw-yeJA0Tunw --max=50
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts dl-channel "https://youtube.com/@channelname"
+```
+
+### Get Transcripts/Subtitles
+
+```bash
+# Get video transcript (auto-generated or manual subtitles)
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts transcript dQw4w9WgXcQ
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts transcript dQw4w9WgXcQ --lang=es
+```
+
+Returns both the full text and timestamped segments for analysis.
+
+### Download Videos
+
+```bash
+# Download video (best quality)
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts download dQw4w9WgXcQ
+
+# Download to specific directory
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts download dQw4w9WgXcQ --output=./videos
+
+# Download specific quality
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts download dQw4w9WgXcQ --format=720p
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts download dQw4w9WgXcQ --format=mp4
+
+# Extract audio only (MP3)
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts download dQw4w9WgXcQ --audio-only
+
+# Download with subtitles
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts download dQw4w9WgXcQ --subtitles --sub-lang=en
+```
+
+### Download Playlists/Channels
+
+```bash
+# Download entire playlist
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts dl-playlist "https://youtube.com/playlist?list=PL..."
+
+# Download first 5 videos
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts dl-playlist "https://youtube.com/playlist?list=..." --max=5
+
+# Download videos 10-20
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts dl-playlist "https://youtube.com/playlist?list=..." --start=10 --end=20
+
+# Download as audio
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts dl-playlist "https://youtube.com/playlist?list=..." --audio-only --output=./music
+```
+
+## Download Options
 
 | Option | Description |
 |--------|-------------|
-| `--query` | Search query (required) |
-| `--max` | Max results (default: 10) |
-| `--type` | Filter by: `video`, `channel`, `playlist` |
+| `--output=DIR` | Output directory (default: current) |
+| `--format=FMT` | Format: `best`, `mp4`, `720p`, `480p`, `360p` |
+| `--audio-only` | Extract audio as MP3 |
+| `--subtitles` | Download subtitles with video |
+| `--sub-lang=LANG` | Subtitle language code (default: en) |
+| `--max=N` | Max videos for playlist download |
+| `--start=N` | Start from video N in playlist |
+| `--end=N` | End at video N in playlist |
 
 ## Video IDs
 
@@ -59,19 +135,12 @@ Video IDs are the 11-character code in YouTube URLs:
 - `https://www.youtube.com/watch?v=dQw4w9WgXcQ` → ID is `dQw4w9WgXcQ`
 - `https://youtu.be/dQw4w9WgXcQ` → ID is `dQw4w9WgXcQ`
 
-## Data Returned
+## Channel References
 
-**Video details include:**
-- Title, description, publish date
-- View count, like count, comment count
-- Duration, channel info, thumbnail
-
-**Channel details include:**
-- Title, description, custom URL
-- Subscriber count, video count, view count
-
-**Playlist items include:**
-- Video ID, title, description, position
+Channels can be referenced by:
+- Handle: `@mkbhd`
+- Channel ID: `UCXuqSBlHAE6Xw-yeJA0Tunw`
+- Full URL: `https://youtube.com/@mkbhd`
 
 ## Output
 
