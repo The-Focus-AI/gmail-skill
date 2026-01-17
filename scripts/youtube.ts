@@ -463,9 +463,13 @@ function ytdlpGetTranscript(
     const vttContent = fs.readFileSync(path.join(tmpDir, subFile), "utf-8");
 
     // Parse VTT to extract text and timestamps
+    // YouTube auto-generated VTT has a "karaoke" format where each cue shows
+    // the current line plus the next line being typed. We need to extract
+    // only the unique text from the first line of each cue.
     const segments: Array<{ start: number; text: string }> = [];
     const lines = vttContent.split("\n");
     let currentStart: number | null = null;
+    let isFirstLineOfCue = true;
     let currentText = "";
 
     for (const line of lines) {
@@ -485,17 +489,24 @@ function ytdlpGetTranscript(
         const ms = parseInt(timestampMatch[4]);
         currentStart = hours * 3600 + minutes * 60 + seconds + ms / 1000;
         currentText = "";
+        isFirstLineOfCue = true;
       } else if (
         line.trim() &&
         !line.startsWith("WEBVTT") &&
+        !line.startsWith("Kind:") &&
+        !line.startsWith("Language:") &&
         !line.match(/^\d+$/) &&
         !line.includes("-->")
       ) {
-        // Text line (skip WEBVTT header and cue numbers)
-        // Remove VTT formatting tags
-        const cleanLine = line.replace(/<[^>]+>/g, "").trim();
-        if (cleanLine) {
-          currentText += (currentText ? " " : "") + cleanLine;
+        // Text line (skip WEBVTT header, metadata, and cue numbers)
+        // Only take the first line of each cue (YouTube shows 2 lines per cue)
+        if (isFirstLineOfCue) {
+          // Remove VTT formatting tags like <00:00:00.000><c>word</c>
+          const cleanLine = line.replace(/<[^>]+>/g, "").trim();
+          if (cleanLine) {
+            currentText = cleanLine;
+          }
+          isFirstLineOfCue = false;
         }
       }
     }

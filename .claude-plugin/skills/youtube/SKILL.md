@@ -1,7 +1,7 @@
 ---
 name: youtube
-description: This skill should be used when the user asks about "youtube", "my videos", "my channel", "youtube search", "video comments", "playlists", "list videos", "channel stats", "video details", "download video", "get transcript", "video subtitles", "summarize channel", "latest videos from channel", or mentions YouTube operations. Provides YouTube Data API integration and yt-dlp for downloading videos, transcripts, and metadata from any channel. Includes workflow for comprehensive channel video summaries.
-version: 0.3.0
+description: This skill should be used when the user asks about "youtube", "my videos", "my channel", "youtube search", "video comments", "playlists", "list videos", "channel stats", "video details", "download video", "get transcript", "video subtitles", "summarize channel", "latest videos from channel", "video timestamp", "link to timestamp", or mentions YouTube operations. Provides YouTube Data API integration and yt-dlp for downloading videos, transcripts, and metadata from any channel. Includes workflow for comprehensive channel video summaries.
+version: 0.4.0
 ---
 
 # YouTube Skill
@@ -79,6 +79,49 @@ npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts transcript dQw4w9WgXcQ --lang=e
 ```
 
 Returns both the full text and timestamped segments for analysis.
+
+**Transcript Output Format:**
+```json
+{
+  "success": true,
+  "data": {
+    "language": "en",
+    "text": "Full transcript text joined together...",
+    "segments": [
+      { "start": 0.16, "text": "First segment text" },
+      { "start": 4.55, "text": "Second segment text" },
+      ...
+    ],
+    "segmentCount": 566
+  }
+}
+```
+
+### Creating Timestamped Links
+
+Use segment timestamps to create deep links to specific moments in videos:
+
+**URL Format:** `https://www.youtube.com/watch?v={videoId}&t={seconds}s`
+
+**Examples:**
+- Timestamp 120.5 seconds → `https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=120s`
+- Timestamp 3661.2 seconds (1:01:01) → `https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=3661s`
+
+**Converting segment.start to link:**
+```
+segment.start = 289.12
+videoId = "rHdMviAhDtE"
+link = https://www.youtube.com/watch?v=rHdMviAhDtE&t=289s
+```
+
+**Markdown format for summaries:**
+```markdown
+[4:49](https://www.youtube.com/watch?v=rHdMviAhDtE&t=289s) - Eddie Bauer review starts
+```
+
+**Helper: Convert seconds to MM:SS or HH:MM:SS:**
+- 289 seconds → `4:49` (Math.floor(289/60) + ":" + (289%60).toString().padStart(2,'0'))
+- 3661 seconds → `1:01:01`
 
 ### Download Videos
 
