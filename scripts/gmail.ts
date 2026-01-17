@@ -2,6 +2,7 @@
 
 import path from "node:path";
 import fs from "node:fs/promises";
+import { readdirSync } from "node:fs";
 import { google, gmail_v1, calendar_v3 } from "googleapis";
 
 import {
@@ -530,6 +531,379 @@ async function downloadMessageAsEml(
 }
 
 // ============================================================================
+// Markdown to HTML Email (Focus.AI Brand)
+// ============================================================================
+
+function getLatestBrandVersion(): string {
+  const brandBase = path.join(
+    process.env.HOME || "",
+    ".claude/plugins/cache/focus-marketplace/focus-ai-brand"
+  );
+
+  // List version directories and sort semver descending
+  let versions: string[];
+  try {
+    versions = readdirSync(brandBase)
+      .filter((v) => /^\d+\.\d+\.\d+$/.test(v))
+      .sort((a, b) => {
+        const [aMaj, aMin, aPat] = a.split(".").map(Number);
+        const [bMaj, bMin, bPat] = b.split(".").map(Number);
+        return bMaj - aMaj || bMin - aMin || bPat - aPat;
+      });
+  } catch {
+    throw new Error("focus-ai-brand plugin not found");
+  }
+
+  if (versions.length === 0) {
+    throw new Error("focus-ai-brand plugin not found");
+  }
+
+  return path.join(brandBase, versions[0], "templates");
+}
+
+function markdownToHtml(md: string): { html: string; title: string } {
+  let html = md;
+  let title = "Report";
+
+  // Extract title from first H1
+  const titleMatch = html.match(/^# (.+)$/m);
+  if (titleMatch) title = titleMatch[1];
+
+  // Handle code blocks first (before inline code)
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, _lang, code) => {
+    return `<pre><code>${code.trim()}</code></pre>`;
+  });
+
+  // Handle tables - find consecutive lines starting with |
+  html = html.replace(/(^\|.+\|$\n?)+/gm, (tableBlock) => {
+    const rows = tableBlock.trim().split("\n").filter((r) => r.trim());
+    if (rows.length < 2) return tableBlock;
+
+    const parseRow = (row: string): string[] => {
+      return row
+        .split("|")
+        .slice(1, -1) // Remove empty first/last from | borders
+        .map((cell) => cell.trim());
+    };
+
+    const headerCells = parseRow(rows[0]);
+    // Skip separator row (row with dashes like |---|---|)
+    const isSeparator = (row: string) => /^\|[\s:-]+\|$/.test(row.replace(/\|/g, "|"));
+    const dataRows = rows.slice(1).filter((r) => !isSeparator(r));
+
+    let tableHtml = "<table>\n<thead>\n<tr>\n";
+    for (const cell of headerCells) {
+      tableHtml += `<th>${cell}</th>\n`;
+    }
+    tableHtml += "</tr>\n</thead>\n<tbody>\n";
+
+    for (const row of dataRows) {
+      const cells = parseRow(row);
+      tableHtml += "<tr>\n";
+      for (const cell of cells) {
+        tableHtml += `<td>${cell}</td>\n`;
+      }
+      tableHtml += "</tr>\n";
+    }
+    tableHtml += "</tbody>\n</table>";
+    return tableHtml;
+  });
+
+  // Convert markdown syntax to HTML
+  html = html
+    .replace(/^#### (.+)$/gm, "<h4>$1</h4>")
+    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+?)\*/g, "<em>$1</em>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+    .replace(/^> (.+)$/gm, "<blockquote><p>$1</p></blockquote>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/^---$/gm, "<hr>");
+
+  // Handle unordered lists
+  html = html.replace(/(^- .+$\n?)+/gm, (match) => {
+    const items = match
+      .split("\n")
+      .filter((line) => line.trim())
+      .map((line) => `<li>${line.replace(/^- /, "")}</li>`)
+      .join("\n");
+    return `<ul>\n${items}\n</ul>`;
+  });
+
+  // Handle ordered lists
+  html = html.replace(/(^\d+\. .+$\n?)+/gm, (match) => {
+    const items = match
+      .split("\n")
+      .filter((line) => line.trim())
+      .map((line) => `<li>${line.replace(/^\d+\. /, "")}</li>`)
+      .join("\n");
+    return `<ol>\n${items}\n</ol>`;
+  });
+
+  // Merge consecutive blockquotes
+  html = html.replace(/<\/blockquote>\n<blockquote>/g, "\n");
+
+  // Wrap loose text in paragraphs (lines not already wrapped)
+  const lines = html.split("\n");
+  const processedLines: string[] = [];
+  let inParagraph = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const isBlockElement =
+      /^<(h[1-6]|ul|ol|li|blockquote|pre|hr|p|table|thead|tbody|tr|th|td)/.test(trimmed) ||
+      /^<\/(h[1-6]|ul|ol|li|blockquote|pre|p|table|thead|tbody|tr|th|td)>/.test(trimmed);
+
+    if (!trimmed) {
+      if (inParagraph) {
+        processedLines.push("</p>");
+        inParagraph = false;
+      }
+      processedLines.push(line);
+    } else if (isBlockElement) {
+      if (inParagraph) {
+        processedLines.push("</p>");
+        inParagraph = false;
+      }
+      processedLines.push(line);
+    } else if (!inParagraph) {
+      processedLines.push("<p>" + line);
+      inParagraph = true;
+    } else {
+      processedLines.push(line);
+    }
+  }
+
+  if (inParagraph) {
+    processedLines.push("</p>");
+  }
+
+  html = processedLines.join("\n");
+
+  return { html, title };
+}
+
+function getEmailTemplate(style: "client" | "labs"): string {
+  // Email-optimized templates with inline styles (email clients don't support CSS variables, clamp, etc.)
+  const clientTemplate = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{TITLE}}</title>
+</head>
+<body style="margin: 0; padding: 20px; background-color: #e8e6df; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 680px; margin: 0 auto;">
+    <tr>
+      <td style="background: #faf9f6; padding: 40px; border: 1px solid #d4d3cf; border-radius: 8px;">
+        {{CONTENT}}
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  const labsTemplate = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{TITLE}}</title>
+</head>
+<body style="margin: 0; padding: 20px; background-color: #e8e6df; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 680px; margin: 0 auto;">
+    <tr>
+      <td style="background: #f3f2ea; padding: 40px; border: 1px solid #1a1a1a; box-shadow: 8px 8px 0px 0px rgba(0,0,0,0.1);">
+        {{CONTENT}}
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return style === "labs" ? labsTemplate : clientTemplate;
+}
+
+function markdownToEmailHtml(md: string, style: "client" | "labs"): { html: string; title: string } {
+  let title = "Report";
+
+  // Extract title from first H1
+  const titleMatch = md.match(/^# (.+)$/m);
+  if (titleMatch) title = titleMatch[1];
+
+  // Style definitions based on brand
+  const isLabs = style === "labs";
+  const styles = {
+    h1: isLabs
+      ? 'style="font-size: 36px; font-weight: 900; letter-spacing: -0.02em; line-height: 1.0; color: #1a1a1a; margin: 0 0 20px 0; padding-bottom: 20px; border-bottom: 2px solid #1a1a1a;"'
+      : 'style="font-size: 32px; font-weight: 700; letter-spacing: -0.045em; line-height: 1.1; color: #161616; margin: 0 0 20px 0; padding-bottom: 20px; border-bottom: 2px solid #0e3b46;"',
+    h2: isLabs
+      ? 'style="font-size: 22px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; line-height: 1.2; color: #1a1a1a; margin: 32px 0 16px 0; padding-bottom: 8px; border-bottom: 1px solid #1a1a1a;"'
+      : 'style="font-size: 24px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.2; color: #161616; margin: 32px 0 16px 0; padding-bottom: 8px; border-bottom: 1px solid #d4d3cf;"',
+    h3: isLabs
+      ? 'style="font-size: 18px; font-weight: 700; line-height: 1.3; color: #1a1a1a; margin: 24px 0 12px 0;"'
+      : 'style="font-size: 18px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.3; color: #161616; margin: 24px 0 12px 0;"',
+    h4: 'style="font-size: 16px; font-weight: 700; color: #161616; margin: 20px 0 8px 0;"',
+    p: 'style="font-size: 16px; line-height: 1.6; color: #161616; margin: 0 0 16px 0;"',
+    a: isLabs
+      ? 'style="color: #0055aa; text-decoration: underline;"'
+      : 'style="color: #0e3b46; text-decoration: none; border-bottom: 1px solid #0e3b46;"',
+    blockquote: isLabs
+      ? 'style="margin: 20px 0; padding: 16px; background: white; border: 1px solid #1a1a1a; border-left: 4px solid #0055aa;"'
+      : 'style="margin: 20px 0; padding: 16px 20px; border-left: 3px solid #0e3b46; background: rgba(14, 59, 70, 0.03); font-style: italic; color: #4a4a4a;"',
+    code: isLabs
+      ? 'style="font-family: \'Courier New\', monospace; font-size: 14px; background: #e6e4dc; padding: 2px 6px; border: 1px solid rgba(26, 26, 26, 0.2);"'
+      : 'style="font-family: \'Courier New\', monospace; font-size: 14px; background: rgba(14, 59, 70, 0.06); padding: 2px 6px; border-radius: 3px; color: #0e3b46;"',
+    pre: 'style="margin: 20px 0; padding: 20px; background: #161616; color: #faf9f6; overflow-x: auto; font-family: \'Courier New\', monospace; font-size: 14px; line-height: 1.5; border-radius: 6px;"',
+    hr: isLabs
+      ? 'style="margin: 32px 0; border: none; border-top: 2px solid #1a1a1a;"'
+      : 'style="margin: 32px 0; border: none; height: 1px; background: #d4d3cf;"',
+    ul: 'style="margin: 0 0 16px 0; padding-left: 24px;"',
+    ol: 'style="margin: 0 0 16px 0; padding-left: 24px;"',
+    li: 'style="font-size: 16px; line-height: 1.6; color: #161616; margin-bottom: 8px;"',
+    table: 'style="width: 100%; margin: 20px 0; border-collapse: collapse; font-size: 15px;"',
+    th: isLabs
+      ? 'style="padding: 10px 12px; text-align: left; border: 1px solid #1a1a1a; font-family: \'Courier New\', monospace; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; background: #1a1a1a; color: #f3f2ea;"'
+      : 'style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #d4d3cf; font-family: \'Courier New\', monospace; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; color: #0e3b46; background: rgba(14, 59, 70, 0.03);"',
+    td: isLabs
+      ? 'style="padding: 10px 12px; text-align: left; border: 1px solid #1a1a1a; font-size: 15px;"'
+      : 'style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #d4d3cf; font-size: 15px;"',
+    strong: 'style="font-weight: 700;"',
+    em: 'style="font-style: italic;"',
+  };
+
+  let html = md;
+
+  // Handle code blocks first (before inline code)
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, _lang, code) => {
+    return `<pre ${styles.pre}><code>${code.trim()}</code></pre>`;
+  });
+
+  // Handle tables
+  html = html.replace(/(^\|.+\|$\n?)+/gm, (tableBlock) => {
+    const rows = tableBlock.trim().split("\n").filter((r) => r.trim());
+    if (rows.length < 2) return tableBlock;
+
+    const parseRow = (row: string): string[] => {
+      return row.split("|").slice(1, -1).map((cell) => cell.trim());
+    };
+
+    const headerCells = parseRow(rows[0]);
+    const isSeparator = (row: string) => /^\|[\s:-]+\|$/.test(row.replace(/\|/g, "|"));
+    const dataRows = rows.slice(1).filter((r) => !isSeparator(r));
+
+    let tableHtml = `<table ${styles.table}><thead><tr>`;
+    for (const cell of headerCells) {
+      tableHtml += `<th ${styles.th}>${cell}</th>`;
+    }
+    tableHtml += "</tr></thead><tbody>";
+
+    for (const row of dataRows) {
+      const cells = parseRow(row);
+      tableHtml += "<tr>";
+      for (const cell of cells) {
+        tableHtml += `<td ${styles.td}>${cell}</td>`;
+      }
+      tableHtml += "</tr>";
+    }
+    tableHtml += "</tbody></table>";
+    return tableHtml;
+  });
+
+  // Convert headers
+  html = html
+    .replace(/^#### (.+)$/gm, `<h4 ${styles.h4}>$1</h4>`)
+    .replace(/^### (.+)$/gm, `<h3 ${styles.h3}>$1</h3>`)
+    .replace(/^## (.+)$/gm, `<h2 ${styles.h2}>$1</h2>`)
+    .replace(/^# (.+)$/gm, `<h1 ${styles.h1}>$1</h1>`);
+
+  // Inline formatting
+  html = html
+    .replace(/\*\*(.+?)\*\*/g, `<strong ${styles.strong}>$1</strong>`)
+    .replace(/\*([^*]+?)\*/g, `<em ${styles.em}>$1</em>`)
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, `<a href="$2" ${styles.a}>$1</a>`)
+    .replace(/`([^`]+)`/g, `<code ${styles.code}>$1</code>`)
+    .replace(/^---$/gm, `<hr ${styles.hr}>`);
+
+  // Blockquotes
+  html = html.replace(/^> (.+)$/gm, `<blockquote ${styles.blockquote}><p ${styles.p}>$1</p></blockquote>`);
+
+  // Unordered lists
+  html = html.replace(/(^- .+$\n?)+/gm, (match) => {
+    const items = match
+      .split("\n")
+      .filter((line) => line.trim())
+      .map((line) => `<li ${styles.li}>${line.replace(/^- /, "")}</li>`)
+      .join("\n");
+    return `<ul ${styles.ul}>\n${items}\n</ul>`;
+  });
+
+  // Ordered lists
+  html = html.replace(/(^\d+\. .+$\n?)+/gm, (match) => {
+    const items = match
+      .split("\n")
+      .filter((line) => line.trim())
+      .map((line) => `<li ${styles.li}>${line.replace(/^\d+\. /, "")}</li>`)
+      .join("\n");
+    return `<ol ${styles.ol}>\n${items}\n</ol>`;
+  });
+
+  // Merge consecutive blockquotes
+  html = html.replace(/<\/blockquote>\n<blockquote[^>]*>/g, "\n");
+
+  // Wrap loose text in paragraphs
+  const lines = html.split("\n");
+  const processedLines: string[] = [];
+  let inParagraph = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const isBlockElement =
+      /^<(h[1-6]|ul|ol|li|blockquote|pre|hr|p|table|thead|tbody|tr|th|td)/.test(trimmed) ||
+      /^<\/(h[1-6]|ul|ol|li|blockquote|pre|p|table|thead|tbody|tr|th|td)>/.test(trimmed);
+
+    if (!trimmed) {
+      if (inParagraph) {
+        processedLines.push("</p>");
+        inParagraph = false;
+      }
+      processedLines.push(line);
+    } else if (isBlockElement) {
+      if (inParagraph) {
+        processedLines.push("</p>");
+        inParagraph = false;
+      }
+      processedLines.push(line);
+    } else if (!inParagraph) {
+      processedLines.push(`<p ${styles.p}>` + line);
+      inParagraph = true;
+    } else {
+      processedLines.push(line);
+    }
+  }
+
+  if (inParagraph) {
+    processedLines.push("</p>");
+  }
+
+  html = processedLines.join("\n");
+
+  return { html, title };
+}
+
+function applyTemplate(
+  template: string,
+  title: string,
+  content: string
+): string {
+  return template
+    .replace("{{TITLE}}", title)
+    .replace("{{CONTENT}}", content);
+}
+
+// ============================================================================
 // Calendar Operations
 // ============================================================================
 
@@ -701,6 +1075,11 @@ GMAIL:
     --remove=LABEL        Remove label
   download ID             Download message as EML file
     --output=PATH         Output file path (default: <id>.eml)
+  send-md                 Send markdown as styled HTML email
+    --to=EMAIL            Recipient (required)
+    --file=PATH           Markdown file to send (required)
+    --style=client|labs   Focus.AI brand style (default: client)
+    --subject=TEXT        Subject (default: first H1 in markdown)
 
 CALENDAR:
   calendars               List all calendars
@@ -837,6 +1216,40 @@ async function main(): Promise<void> {
         const gmail = await getGmailClient();
         const result = await downloadMessageAsEml(gmail, messageId, flags.output);
         output({ success: true, data: { ...result, message: "Message downloaded as EML" } });
+        break;
+      }
+
+      case "send-md": {
+        const { to, file, style, subject } = flags;
+        if (!to || !file) fail("Required: --to, --file [--style=client|labs] [--subject=TEXT]");
+
+        // Read markdown file
+        const mdPath = path.isAbsolute(file) ? file : path.resolve(process.cwd(), file);
+        const markdown = await fs.readFile(mdPath, "utf-8");
+
+        // Convert markdown to email-optimized HTML with inline styles
+        const templateStyle = (style === "labs" ? "labs" : "client") as "client" | "labs";
+        const { html: contentHtml, title } = markdownToEmailHtml(markdown, templateStyle);
+
+        // Apply email template wrapper
+        const template = getEmailTemplate(templateStyle);
+        const finalSubject = subject || title;
+        const finalHtml = applyTemplate(template, finalSubject, contentHtml);
+
+        // Send email
+        const gmail = await getGmailClient();
+        const plainText = markdown; // Use original markdown as plain text fallback
+        const result = await sendMessage(gmail, to, finalSubject, plainText, finalHtml);
+
+        output({
+          success: true,
+          data: {
+            ...result,
+            message: `Styled email sent with Focus.AI ${templateStyle} template`,
+            subject: finalSubject,
+            style: templateStyle,
+          },
+        });
         break;
       }
 

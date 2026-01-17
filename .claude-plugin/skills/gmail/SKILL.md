@@ -1,7 +1,7 @@
 ---
 name: gmail
-description: This skill should be used when the user asks to "read emails", "send an email", "search gmail", "list messages", "check inbox", "manage labels", "find emails from", "check my calendar", "list events", "create an event", "schedule a meeting", or mentions Gmail/Calendar operations. Provides Gmail and Google Calendar API integration.
-version: 0.2.0
+description: This skill should be used when the user asks to "read emails", "send an email", "search gmail", "list messages", "check inbox", "manage labels", "find emails from", "check my calendar", "list events", "create an event", "schedule a meeting", "send styled email", "send markdown email", or mentions Gmail/Calendar operations. Provides Gmail and Google Calendar API integration.
+version: 0.6.0
 ---
 
 # Gmail & Calendar Skill
@@ -68,7 +68,29 @@ npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gmail.ts label <id> --add="IMPORTANT"
 
 # Download as EML
 npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gmail.ts download <message-id>
+
+# Send markdown as styled HTML email (Focus.AI branding)
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gmail.ts send-md \
+  --to="recipient@example.com" \
+  --file="/path/to/report.md" \
+  --style=client  # or "labs" for Focus.AI Labs style
+
+# Subject defaults to first H1 in markdown, or specify explicitly:
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gmail.ts send-md \
+  --to="recipient@example.com" \
+  --file="report.md" \
+  --style=labs \
+  --subject="Weekly Report"
 ```
+
+## Styled Email Templates
+
+The `send-md` command converts markdown to beautifully styled HTML emails using Focus.AI brand guidelines:
+
+- **client** (default): Professional style with teal accents, subtle borders, rounded corners
+- **labs**: Bold experimental style with black borders, box shadows, uppercase headers
+
+Supports: headings, bold/italic, links, code blocks, tables, lists, blockquotes, horizontal rules.
 
 ## Calendar Commands
 

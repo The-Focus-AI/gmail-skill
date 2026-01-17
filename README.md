@@ -4,7 +4,7 @@ Full Google services integration for Claude Code: Gmail, Calendar, Sheets, Docs,
 
 ## Features
 
-- **Gmail**: Read, send, search emails. Manage labels. Download as EML. HTML emails with attachments.
+- **Gmail**: Read, send, search emails. Manage labels. Download as EML. HTML emails with attachments. **Send markdown as styled HTML emails with Focus.AI branding.**
 - **Calendar**: List, create, delete events. Multiple calendar support.
 - **Sheets**: Create spreadsheets, read/write cells, append rows.
 - **Docs**: Create documents, read content, insert/append text, find/replace.
@@ -98,6 +98,7 @@ pnpm run gmail list
 pnpm run gmail list --query="is:unread"
 pnpm run gmail read <message-id>
 pnpm run gmail send --to=x@y.com --subject="Hi" --body="Hello"
+pnpm run gmail send-md --to=x@y.com --file=report.md --style=client
 pnpm run gmail --help
 
 # Calendar
