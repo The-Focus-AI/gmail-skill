@@ -4,13 +4,14 @@ Full Google services integration for Claude Code: Gmail, Calendar, Sheets, Docs,
 
 ## Features
 
-- **Gmail**: Read, send, search emails. Manage labels. Download as EML.
+- **Gmail**: Read, send, search emails. Manage labels. Download as EML. HTML emails with attachments.
 - **Calendar**: List, create, delete events. Multiple calendar support.
 - **Sheets**: Create spreadsheets, read/write cells, append rows.
 - **Docs**: Create documents, read content, insert/append text, find/replace.
 - **YouTube**: Search, list videos/channels/playlists, view comments.
+- **YouTube (yt-dlp)**: Download videos, extract transcripts, list any channel's videos, create channel summaries.
 
-All services share a single OAuth authentication.
+All services share a single OAuth authentication. yt-dlp features work without OAuth.
 
 ## Installation
 
@@ -27,6 +28,12 @@ All services share a single OAuth authentication.
 ```
 
 Then restart Claude Code.
+
+### For yt-dlp Features
+
+```bash
+brew install yt-dlp
+```
 
 ## First-Time Setup
 
@@ -77,43 +84,172 @@ Once authenticated, Claude can:
 - **Sheets**: "list my spreadsheets", "read cells A1:D10 from...", "create a spreadsheet"
 - **Docs**: "list my documents", "read document...", "create a doc called..."
 - **YouTube**: "list my videos", "search YouTube for...", "get comments on..."
+- **YouTube (yt-dlp)**: "what are the latest videos from @channelname", "get transcript for this video", "summarize this channel's recent content"
 
 ### Manual Commands
 
 ```bash
 # Gmail
-npx tsx scripts/gmail.ts list
-npx tsx scripts/gmail.ts list --query="is:unread"
-npx tsx scripts/gmail.ts read <message-id>
-npx tsx scripts/gmail.ts send --to=x@y.com --subject="Hi" --body="Hello"
-npx tsx scripts/gmail.ts --help
+pnpm run gmail list
+pnpm run gmail list --query="is:unread"
+pnpm run gmail read <message-id>
+pnpm run gmail send --to=x@y.com --subject="Hi" --body="Hello"
+pnpm run gmail --help
 
 # Calendar
-npx tsx scripts/gmail.ts calendars
-npx tsx scripts/gmail.ts events
-npx tsx scripts/gmail.ts create --summary="Meeting" --start="2026-01-15T10:00:00" --end="2026-01-15T11:00:00"
+pnpm run gmail calendars
+pnpm run gmail events
+pnpm run gmail create --summary="Meeting" --start="2026-01-15T10:00:00" --end="2026-01-15T11:00:00"
 
 # Sheets
-npx tsx scripts/gsheets.ts list
-npx tsx scripts/gsheets.ts read <spreadsheetId> "Sheet1!A1:D10"
-npx tsx scripts/gsheets.ts write <spreadsheetId> "Sheet1!A1" --values='[["Hello","World"]]'
-npx tsx scripts/gsheets.ts create --title="My Data"
-npx tsx scripts/gsheets.ts --help
+pnpm run gsheets list
+pnpm run gsheets read <spreadsheetId> "Sheet1!A1:D10"
+pnpm run gsheets write <spreadsheetId> "Sheet1!A1" --values='[["Hello","World"]]'
+pnpm run gsheets create --title="My Data"
+pnpm run gsheets --help
 
 # Docs
-npx tsx scripts/gdocs.ts list
-npx tsx scripts/gdocs.ts read <documentId>
-npx tsx scripts/gdocs.ts create --title="My Document"
-npx tsx scripts/gdocs.ts append <documentId> --text="New paragraph"
-npx tsx scripts/gdocs.ts --help
+pnpm run gdocs list
+pnpm run gdocs read <documentId>
+pnpm run gdocs create --title="My Document"
+pnpm run gdocs append <documentId> --text="New paragraph"
+pnpm run gdocs --help
 
-# YouTube
-npx tsx scripts/youtube.ts channels
-npx tsx scripts/youtube.ts videos
-npx tsx scripts/youtube.ts search --query="typescript tutorial"
-npx tsx scripts/youtube.ts comments <videoId>
-npx tsx scripts/youtube.ts --help
+# YouTube (API - requires OAuth)
+pnpm run youtube channels
+pnpm run youtube videos
+pnpm run youtube search --query="typescript tutorial"
+pnpm run youtube comments <videoId>
+pnpm run youtube --help
+
+# YouTube (yt-dlp - no OAuth required)
+pnpm run youtube dl-channel @mkbhd --max=10
+pnpm run youtube dl-info <videoId>
+pnpm run youtube transcript <videoId>
+pnpm run youtube download <videoId> --output=./videos
+pnpm run youtube download <videoId> --audio-only
 ```
+
+## YouTube yt-dlp Features
+
+These commands use yt-dlp and work without OAuth authentication on any public YouTube content.
+
+### List Channel Videos
+
+```bash
+# By handle
+pnpm run youtube dl-channel @mkbhd --max=20
+
+# By channel ID
+pnpm run youtube dl-channel UC5M-w62kRmrD3-Saf-qGTug --max=10
+
+# By URL
+pnpm run youtube dl-channel "https://youtube.com/@TuringPost" --max=15
+```
+
+### Get Video Transcripts
+
+```bash
+# Get transcript (auto-generated or manual subtitles)
+pnpm run youtube transcript dQw4w9WgXcQ
+
+# Specific language
+pnpm run youtube transcript dQw4w9WgXcQ --lang=es
+```
+
+Returns full text and timestamped segments.
+
+### Download Videos
+
+```bash
+# Best quality
+pnpm run youtube download dQw4w9WgXcQ
+
+# To specific directory
+pnpm run youtube download dQw4w9WgXcQ --output=./videos
+
+# Specific quality
+pnpm run youtube download dQw4w9WgXcQ --format=720p
+
+# Audio only (MP3)
+pnpm run youtube download dQw4w9WgXcQ --audio-only
+
+# With subtitles
+pnpm run youtube download dQw4w9WgXcQ --subtitles --sub-lang=en
+```
+
+### Download Playlists
+
+```bash
+# Entire playlist
+pnpm run youtube dl-playlist "https://youtube.com/playlist?list=PL..."
+
+# First 5 videos
+pnpm run youtube dl-playlist "https://youtube.com/playlist?list=..." --max=5
+
+# As audio
+pnpm run youtube dl-playlist "https://youtube.com/playlist?list=..." --audio-only
+```
+
+## Channel Summary Workflow
+
+Create comprehensive summaries of a YouTube channel's recent videos with transcripts, key points, and external links.
+
+### Quick Start
+
+```bash
+# 1. List recent videos
+pnpm run youtube dl-channel "@TuringPost" --max=10
+
+# 2. Get transcripts (run multiple in parallel for speed)
+pnpm run youtube transcript VIDEO_ID_1
+pnpm run youtube transcript VIDEO_ID_2
+# ... etc
+
+# 3. Create summaries with:
+#    - Key points (3-6 bullets)
+#    - Most interesting insight
+#    - Overall summary
+
+# 4. Research and add external links for:
+#    - People mentioned (Twitter, LinkedIn, Wikipedia)
+#    - Companies (official sites, funding info)
+#    - Books (Amazon, publisher sites)
+#    - Products/tools (official sites)
+
+# 5. Export as markdown
+```
+
+### Example Output Structure
+
+```markdown
+# Channel Name Video Summaries
+
+## 1. Video Title
+
+**URL:** https://www.youtube.com/watch?v=VIDEO_ID
+**Duration:** 10:30
+
+### Key Points
+- [Person Name](twitter-link) discussed topic X
+- [Company](company-url) raised $50M for Y
+- Book recommendation: [Book Title](amazon-link)
+
+### Most Interesting Insight
+The single most surprising or valuable takeaway.
+
+### Overall Summary
+2-3 sentences describing what the video covers.
+```
+
+### Use Cases
+
+- Research summaries from tech news channels
+- Extract insights from interview series
+- Document book/product recommendations
+- Build knowledge bases from educational content
+
+See `.claude-plugin/skills/youtube/CHANNEL-SUMMARY.md` for the full workflow documentation.
 
 ## Project Structure
 
@@ -125,7 +261,9 @@ google-skill/
 │       ├── gmail/SKILL.md
 │       ├── gsheets/SKILL.md
 │       ├── gdocs/SKILL.md
-│       └── youtube/SKILL.md
+│       └── youtube/
+│           ├── SKILL.md
+│           └── CHANNEL-SUMMARY.md
 ├── scripts/
 │   ├── lib/
 │   │   ├── auth.ts        # Shared OAuth
@@ -133,7 +271,7 @@ google-skill/
 │   ├── gmail.ts           # Gmail + Calendar
 │   ├── gsheets.ts         # Google Sheets
 │   ├── gdocs.ts           # Google Docs
-│   └── youtube.ts         # YouTube
+│   └── youtube.ts         # YouTube (API + yt-dlp)
 ├── package.json
 └── README.md
 ```
@@ -148,10 +286,10 @@ cd google-skill
 pnpm install
 
 # Test commands
-npx tsx scripts/gmail.ts --help
-npx tsx scripts/gsheets.ts --help
-npx tsx scripts/gdocs.ts --help
-npx tsx scripts/youtube.ts --help
+pnpm run gmail --help
+pnpm run gsheets --help
+pnpm run gdocs --help
+pnpm run youtube --help
 ```
 
 ### Test as Plugin
@@ -164,13 +302,13 @@ claude --plugin-dir /path/to/google-skill
 
 ### "Credentials not found"
 
-Run `npx tsx scripts/gmail.ts auth` and follow the setup instructions.
+Run `pnpm run gmail auth` and follow the setup instructions.
 
 ### "Token expired" or "Invalid credentials"
 
 ```bash
 rm .claude/google-skill.local.json
-npx tsx scripts/gmail.ts auth
+pnpm run gmail auth
 ```
 
 ### "No refresh token received"
@@ -187,6 +325,18 @@ Check:
 - All required APIs are enabled
 - Your email is added as a test user
 - Scopes are configured in OAuth consent screen
+
+### "yt-dlp is not installed"
+
+```bash
+brew install yt-dlp
+```
+
+### "No subtitles available"
+
+Not all videos have transcripts. Try:
+- Different language: `--lang=es`
+- The video may not have auto-generated captions
 
 ### Upgrading from gmail-skill
 

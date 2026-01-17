@@ -1,7 +1,7 @@
 ---
 name: youtube
-description: This skill should be used when the user asks about "youtube", "my videos", "my channel", "youtube search", "video comments", "playlists", "list videos", "channel stats", "video details", "download video", "get transcript", "video subtitles", or mentions YouTube operations. Provides YouTube Data API integration and yt-dlp for downloading videos, transcripts, and metadata from any channel.
-version: 0.2.0
+description: This skill should be used when the user asks about "youtube", "my videos", "my channel", "youtube search", "video comments", "playlists", "list videos", "channel stats", "video details", "download video", "get transcript", "video subtitles", "summarize channel", "latest videos from channel", or mentions YouTube operations. Provides YouTube Data API integration and yt-dlp for downloading videos, transcripts, and metadata from any channel. Includes workflow for comprehensive channel video summaries.
+version: 0.3.0
 ---
 
 # YouTube Skill
@@ -151,3 +151,20 @@ All commands return JSON with `success` and `data` fields.
 ```bash
 npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/youtube.ts --help
 ```
+
+## Channel Summary Workflow
+
+For comprehensive summaries of a channel's recent videos (with transcripts, key points, and external links), see `CHANNEL-SUMMARY.md` in this skill directory.
+
+**Quick workflow:**
+1. List channel videos: `pnpm run youtube dl-channel "@channelname" --max=10`
+2. Get transcripts for each video (run in parallel)
+3. Create summaries with key points and insights
+4. Research and add external links for people, companies, books mentioned
+5. Export as markdown
+
+This workflow is ideal for:
+- Creating research summaries from tech channels
+- Extracting insights from interview series
+- Documenting book/product recommendations from creators
+- Building knowledge bases from educational content
