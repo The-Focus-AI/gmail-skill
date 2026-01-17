@@ -7,6 +7,8 @@
 import { google, docs_v1, drive_v3 } from "googleapis";
 import { loadToken, CREDENTIALS_PATH } from "./lib/auth.js";
 import { output, fail, parseArgs } from "./lib/output.js";
+import * as fs from "fs/promises";
+import * as path from "path";
 
 // ============================================================================
 // Docs Client
@@ -268,6 +270,97 @@ async function replaceText(
 }
 
 // ============================================================================
+// Export Operations
+// ============================================================================
+
+type ExportFormat = "pdf" | "docx" | "odt" | "txt" | "html" | "rtf" | "epub";
+
+const EXPORT_MIME_TYPES: Record<ExportFormat, string> = {
+  pdf: "application/pdf",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  odt: "application/vnd.oasis.opendocument.text",
+  txt: "text/plain",
+  html: "text/html",
+  rtf: "application/rtf",
+  epub: "application/epub+zip",
+};
+
+const FORMAT_EXTENSIONS: Record<ExportFormat, string> = {
+  pdf: ".pdf",
+  docx: ".docx",
+  odt: ".odt",
+  txt: ".txt",
+  html: ".html",
+  rtf: ".rtf",
+  epub: ".epub",
+};
+
+interface ExportResult {
+  documentId: string;
+  format: ExportFormat;
+  path: string;
+  size: number;
+}
+
+async function exportDocument(
+  documentId: string,
+  format: ExportFormat,
+  outputPath?: string
+): Promise<ExportResult> {
+  const drive = await getDriveClient();
+  const mimeType = EXPORT_MIME_TYPES[format];
+
+  // Get document metadata from Drive API (doesn't require Docs API)
+  const fileMeta = await drive.files.get({
+    fileId: documentId,
+    fields: "id,name",
+  });
+  const docName = fileMeta.data.name || "document";
+
+  // Determine output path
+  let finalPath: string;
+  if (outputPath) {
+    // If outputPath is a directory, append filename
+    try {
+      const stat = await fs.stat(outputPath);
+      if (stat.isDirectory()) {
+        const safeName = docName.replace(/[/\\?%*:|"<>]/g, "_");
+        finalPath = path.join(outputPath, safeName + FORMAT_EXTENSIONS[format]);
+      } else {
+        finalPath = outputPath;
+      }
+    } catch {
+      // Path doesn't exist, use it as filename
+      finalPath = outputPath;
+    }
+  } else {
+    // Generate filename from document title
+    const safeName = docName.replace(/[/\\?%*:|"<>]/g, "_");
+    finalPath = safeName + FORMAT_EXTENSIONS[format];
+  }
+
+  // Export the document
+  const res = await drive.files.export(
+    {
+      fileId: documentId,
+      mimeType,
+    },
+    { responseType: "arraybuffer" }
+  );
+
+  // Write to file
+  const buffer = Buffer.from(res.data as ArrayBuffer);
+  await fs.writeFile(finalPath, buffer);
+
+  return {
+    documentId,
+    format,
+    path: path.resolve(finalPath),
+    size: buffer.length,
+  };
+}
+
+// ============================================================================
 // CLI
 // ============================================================================
 
@@ -298,6 +391,10 @@ COMMANDS:
     --replace=TEXT        Replacement text (required)
     --match-case          Match case (default: false)
 
+  export <documentId>     Export document to file
+    --format=FORMAT       Format: pdf, docx, odt, txt, html, rtf, epub (default: pdf)
+    --output=PATH         Output path (optional, defaults to document title)
+
 EXAMPLES:
   # List documents
   npx tsx scripts/gdocs.ts list
@@ -322,6 +419,15 @@ EXAMPLES:
 
   # Find and replace
   npx tsx scripts/gdocs.ts replace 1abc123... --find="old text" --replace="new text"
+
+  # Export to PDF (default)
+  npx tsx scripts/gdocs.ts export 1abc123...
+
+  # Export to Word
+  npx tsx scripts/gdocs.ts export 1abc123... --format=docx
+
+  # Export to specific file
+  npx tsx scripts/gdocs.ts export 1abc123... --format=pdf --output=./report.pdf
 
 Credentials: ${CREDENTIALS_PATH}
 Token:       .claude/google-skill.local.json (per-project)
@@ -418,6 +524,29 @@ async function main(): Promise<void> {
           data: {
             ...result,
             message: `Replaced ${result.occurrencesChanged} occurrence(s)`,
+          },
+        });
+        break;
+      }
+
+      case "export": {
+        const documentId = positional[0];
+        if (!documentId) {
+          fail("Document ID required. Usage: gdocs.ts export <documentId> [--format=pdf|docx|odt|txt|html|rtf|epub] [--output=PATH]");
+        }
+        const formatStr = flags.format || "pdf";
+        const validFormats: ExportFormat[] = ["pdf", "docx", "odt", "txt", "html", "rtf", "epub"];
+        if (!validFormats.includes(formatStr as ExportFormat)) {
+          fail(`Invalid format: ${formatStr}. Valid formats: ${validFormats.join(", ")}`);
+        }
+        const format = formatStr as ExportFormat;
+        const outputPath = flags.output;
+        const result = await exportDocument(documentId, format, outputPath);
+        output({
+          success: true,
+          data: {
+            ...result,
+            message: `Document exported to ${result.path}`,
           },
         });
         break;

@@ -1,12 +1,12 @@
 ---
 name: gdocs
-description: This skill should be used when the user asks to "read document", "create document", "edit document", "google doc", "list documents", "insert text", "append text", "find and replace", or mentions Google Docs operations. Provides Google Docs API integration for reading, writing, and managing documents.
-version: 0.1.0
+description: This skill should be used when the user asks to "read document", "create document", "edit document", "google doc", "list documents", "insert text", "append text", "find and replace", "export document", "export to pdf", "export to word", "download as pdf", or mentions Google Docs operations. Provides Google Docs API integration for reading, writing, exporting, and managing documents.
+version: 0.2.0
 ---
 
 # Google Docs Skill
 
-Create, read, and edit Google Docs documents.
+Create, read, edit, and export Google Docs documents.
 
 ## First-Time Setup
 
@@ -53,7 +53,31 @@ npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gdocs.ts replace <documentId> \
   --find="Hello" \
   --replace="Hi" \
   --match-case
+
+# Export to PDF (default)
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gdocs.ts export <documentId>
+
+# Export to Word (.docx)
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gdocs.ts export <documentId> --format=docx
+
+# Export to other formats (odt, txt, html, rtf, epub)
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gdocs.ts export <documentId> --format=odt
+
+# Export to specific file path
+npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/gdocs.ts export <documentId> --format=pdf --output=./report.pdf
 ```
+
+## Export Formats
+
+| Format | Extension | Description |
+|--------|-----------|-------------|
+| pdf | .pdf | Portable Document Format (default) |
+| docx | .docx | Microsoft Word |
+| odt | .odt | OpenDocument Text |
+| txt | .txt | Plain text |
+| html | .html | Web page |
+| rtf | .rtf | Rich Text Format |
+| epub | .epub | E-book format |
 
 ## Text Formatting Notes
 

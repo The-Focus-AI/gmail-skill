@@ -7,7 +7,7 @@ Full Google services integration for Claude Code: Gmail, Calendar, Sheets, Docs,
 - **Gmail**: Read, send, search emails. Manage labels. Download as EML. HTML emails with attachments. **Send markdown as styled HTML emails with Focus.AI branding.**
 - **Calendar**: List, create, delete events. Multiple calendar support.
 - **Sheets**: Create spreadsheets, read/write cells, append rows.
-- **Docs**: Create documents, read content, insert/append text, find/replace.
+- **Docs**: Create documents, read content, insert/append text, find/replace. **Export to PDF, Word, ODT, and more.**
 - **YouTube**: Search, list videos/channels/playlists, view comments.
 - **YouTube (yt-dlp)**: Download videos, extract transcripts, list any channel's videos, create channel summaries.
 
@@ -86,7 +86,7 @@ Once authenticated, Claude can:
 - **Gmail**: "check my unread emails", "send an email to...", "search for emails from..."
 - **Calendar**: "what's on my calendar today", "create a meeting for..."
 - **Sheets**: "list my spreadsheets", "read cells A1:D10 from...", "create a spreadsheet"
-- **Docs**: "list my documents", "read document...", "create a doc called..."
+- **Docs**: "list my documents", "read document...", "create a doc called...", "export doc to PDF", "download as Word"
 - **YouTube**: "list my videos", "search YouTube for...", "get comments on..."
 - **YouTube (yt-dlp)**: "what are the latest videos from @channelname", "get transcript for this video", "summarize this channel's recent content"
 
@@ -118,6 +118,9 @@ pnpm run gdocs list
 pnpm run gdocs read <documentId>
 pnpm run gdocs create --title="My Document"
 pnpm run gdocs append <documentId> --text="New paragraph"
+pnpm run gdocs export <documentId>                    # PDF (default)
+pnpm run gdocs export <documentId> --format=docx     # Word
+pnpm run gdocs export <documentId> --format=odt      # OpenDocument
 pnpm run gdocs --help
 
 # YouTube (API - requires OAuth)
